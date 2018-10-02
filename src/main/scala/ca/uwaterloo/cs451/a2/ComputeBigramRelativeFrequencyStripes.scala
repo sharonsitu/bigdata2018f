@@ -12,10 +12,12 @@ import scala.collection.mutable._
 
 
 class Conf2(args: Seq[String]) extends ScallopConf(args) {
-  mainOptions = Seq(input, output, reducers)
+  mainOptions = Seq(input, output, reducers, numexecutors, executorcores)
   val input = opt[String](descr = "input path", required = true)
   val output = opt[String](descr = "output path", required = true)
-  val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(1))
+  val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(8))
+  val numexecutors = opt[Int](descr = "number of executors", required = false, default = Some(1))
+  val executorcores = opt[Int](descr = "number of cores", required = false, default = Some(1))
   verify()
 }
 
@@ -36,6 +38,8 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
     log.info("Input: " + args.input())
     log.info("Output: " + args.output())
     log.info("Number of reducers: " + args.reducers())
+    log.info("Number of executors: " + args.numexecutors())
+    log.info("Number of cores: " + args.executorcores())
 
     val conf = new SparkConf().setAppName("ComputeBigramRelativeFrequencyStripes")
     val sc = new SparkContext(conf)
@@ -52,12 +56,10 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
         // split the words(A,B)
         if (tokens.length > 1) {
           tokens.sliding(2).map(p => {
-            val stripe : Map[String, Float]= Map();
             val prev = p.head
             val cur = p.tail.mkString
             //println("prev: "+prev+" cur: "+cur)
-            stripe.put(cur,1.0f)
-            (prev,stripe)
+            (prev,Map(cur->1.0f))
           })
         } else {
           List()
@@ -78,16 +80,13 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
       .map {
       case (key, values) => {
         var marginal = 0.0f
-        val stripe: Map[String, Float] = Map();
-        val stripes = values
-        for ((k, v) <- stripes) {
-          //println("key2: "+k+" value2:"+v)
-          marginal = marginal + v
+        marginal = values.values.foldLeft(0.0f){(a,b) => a + b}
+        var stripe = values.map {
+          case (k,v) => {
+            (k,v/marginal)
+          }
         }
-        for ((k, v) <- stripes) {
-          stripe.put(k, v / marginal)
-        }
-        (key, stripe)
+        (key,stripe)
       }
       }
 

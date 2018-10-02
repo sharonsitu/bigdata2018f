@@ -10,10 +10,12 @@ import org.rogach.scallop._
 import org.apache.spark.Partitioner
 
 class Conf(args: Seq[String]) extends ScallopConf(args) {
-  mainOptions = Seq(input, output, reducers)
+  mainOptions = Seq(input, output, reducers, numexecutors, executorcores)
   val input = opt[String](descr = "input path", required = true)
   val output = opt[String](descr = "output path", required = true)
-  val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(1))
+  val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(8))
+  val numexecutors = opt[Int](descr = "number of executors", required = false, default = Some(1))
+  val executorcores = opt[Int](descr = "number of cores", required = false, default = Some(1))
   verify()
 }
 
@@ -34,6 +36,8 @@ object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
     log.info("Input: " + args.input())
     log.info("Output: " + args.output())
     log.info("Number of reducers: " + args.reducers())
+    log.info("Number of executors: " + args.numexecutors())
+    log.info("Number of cores: " + args.executorcores())
 
     val conf = new SparkConf().setAppName("ComputeBigramRelativeFrequencyPairs")
     val sc = new SparkContext(conf)

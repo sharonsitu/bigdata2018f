@@ -13,11 +13,13 @@ import scala.collection.mutable._
 import scala.collection.JavaConverters._
 
 class Conf3(args: Seq[String]) extends ScallopConf(args) {
-  mainOptions = Seq(input, output, reducers)
+  mainOptions = Seq(input, output, reducers, numexecutors, executorcores)
   val input = opt[String](descr = "input path", required = true)
   val output = opt[String](descr = "output path", required = true)
-  val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(1))
+  val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(8))
   val threshold = opt[Int](descr = "number of threshold", required = false, default = Some(1))
+  val numexecutors = opt[Int](descr = "number of executors", required = false, default = Some(1))
+  val executorcores = opt[Int](descr = "number of cores", required = false, default = Some(1))
   verify()
 }
 
@@ -39,6 +41,8 @@ object PairsPMI extends Tokenizer {
     log.info("Output: " + args.output())
     log.info("Number of reducers: " + args.reducers())
     log.info("Threshold: " + args.threshold())
+    log.info("Number of executors: " + args.numexecutors())
+    log.info("Number of cores: " + args.executorcores())
 
     val conf = new SparkConf().setAppName("PairsPMI")
     val sc = new SparkContext(conf)
@@ -50,12 +54,13 @@ object PairsPMI extends Tokenizer {
 
     val threshold = args.threshold()
 
+    val totalline = textFile.count()
     // for single word
     val counts = textFile
       .flatMap(line => {
         var tokens = tokenize(line)
         // get 40 words of the line
-        tokens = tokens.take(min(40,tokens.size))
+        tokens = tokens.take(min(40,tokens.length))
         if (tokens.length >= 2) {
           var singleword : Map[String,String] = Map()
           // add distinct words in line to singleword
@@ -65,7 +70,7 @@ object PairsPMI extends Tokenizer {
               //println("single "+p)
             }
           }}
-          singleword.put("totalline","*")
+          //singleword.put("totalline","*")
           singleword
         } else {
           List()
@@ -122,7 +127,6 @@ object PairsPMI extends Tokenizer {
         // calculate PMI
       .map{ case ((w1, w2), value) => {
         val countXY = value
-        val totalline : Float = countsSingleWord.value.get("totalline","*").get
         val countX : Float = countsSingleWord.value.get(w1,"*").get
         val countY : Float = countsSingleWord.value.get(w2,"*").get
         //println("T "+totalline)
@@ -131,8 +135,8 @@ object PairsPMI extends Tokenizer {
         val probXY : Float = (countXY / totalline)
         val probX : Float = (countX / totalline)
         val probY : Float = (countY / totalline)
-        val pmiF = log10(countXY / ((countX * countY) / totalline))
-        ((w1,w2),(pmiF,value))
+        val pmi = log10(probXY / (probX * probY))
+        ((w1,w2),(pmi,value))
       }}
 
 
