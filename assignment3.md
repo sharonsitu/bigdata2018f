@@ -5,10 +5,10 @@
 1004K   cs451-lintool-a3-index-shakespeare/part-r-00001 \
 852K    cs451-lintool-a3-index-shakespeare/part-r-00002 \
 1.1M    cs451-lintool-a3-index-shakespeare/part-r-00003 \
-3.8M    cs451-lintool-a3-index-shakespeare \
+3.8M    cs451-lintool-a3-index-shakespeare 
 
 Query: outrageous fortune AND \
-1073319     The slings and arrows of outrageous fortune \
+1073319     The slings and arrows of outrageous fortune 
 
 Query: white red OR rose AND pluck AND \
 1713274     From off this brier pluck a white rose with me. \
@@ -25,13 +25,13 @@ Query: white red OR rose AND pluck AND \
 261.2 M  783.7 M  cs451-lintool-a3-index-wiki/part-r-00003
 
 # Q3
-Query: waterloo stanford OR cheriton AND \
+Query: waterloo stanford OR cheriton AND 
 279261623       Waterloo Maple.0003     Corporate history Waterloo Maple Inc. was first incorporated... \
 514403440       David Cheriton.0011     He spent three years as an Assistant Professor at his alma m... \
 610970282       David R. Cheriton School of Computer Science.0000       The David R. Cheriton School o...
 
 # Q4
-Query: big data AND hadoop spark OR AND \
+Query: big data AND hadoop spark OR AND 
 7602731 Computer security.0143  Some organizations are turning to big data platforms , su... \
 169356674       Index of electronics articles.0001      0-9 16VSB -- 2VSB -- 32VSB -- 4000 series -- ... \
 1065070474      Syncsort.0003   The result was a business with a niche product portfolio originall... \
