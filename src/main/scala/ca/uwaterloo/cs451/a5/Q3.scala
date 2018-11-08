@@ -89,7 +89,7 @@ object Q3 extends Tokenizer {
         .foreach(pair => {
           println(pair._1,pair._2._1,pair._2._2)
         })
-
+      
     } else {
       val sparkSession = SparkSession.builder.getOrCreate
 

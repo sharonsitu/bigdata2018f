@@ -67,7 +67,12 @@ object Q2 extends Tokenizer {
       val combine =   o
         /* outer join : (oderkey: (clerk,shipdate)) */
         .cogroup(l)
+        .filter(_._2._1.nonEmpty)
         .filter(_._2._2.nonEmpty)
+        .flatMap( p => {
+          val dates = p._2._2.toList
+          dates.map( date => (p._1,(p._2._1,date))).toList
+        })
         .sortByKey(true,1)
         .take(20)
         .foreach(pair => {
@@ -100,7 +105,12 @@ object Q2 extends Tokenizer {
       val combine =   o
         /* outer join : (oderkey: (clerk,shipdate)) */
         .cogroup(l)
+        .filter(_._2._1.nonEmpty)
         .filter(_._2._2.nonEmpty)
+        .flatMap( p => {
+          val dates = p._2._2.toList
+          dates.map( date => (p._1,(p._2._1,date))).toList
+        })
         .sortByKey(true,1)
         .take(20)
         .foreach(pair => {
