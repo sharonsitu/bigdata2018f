@@ -46,8 +46,48 @@ class TrendingArrivalsConf(args: Seq[String]) extends ScallopConf(args) {
 object TrendingArrivals {
   val log = Logger.getLogger(getClass().getName())
 
+  val goldman = List((-74.0141012, 40.7152191), (-74.013777, 40.7152275), (-74.0141027, 40.7138745), (-74.0144185, 40.7140753))
+  val citigroup = List((-74.011869, 40.7217236), (-74.009867, 40.721493), (-74.010140,40.720053), (-74.012083, 40.720267))
+
+  def WithinRegion(ranges: List[(Double,Double)], longitude: Double, latitude: Double) : Boolean = {
+    var minLat = Double.MaxValue
+    var maxLat = Double.MinValue
+    var minLong = Double.MaxValue
+    var maxLong = Double.MinValue
+    for (range <- ranges) {
+      var lon = range._1
+      var lat = range._2
+      if (minLat > lat) minLat = lat
+      if (minLong > lon) minLong = lon
+      if (maxLat < lat) maxLat = lat
+      if (maxLong < lon) maxLong = lon
+    }
+    (longitude >= minLong) && (longitude <= maxLong) && (latitude >= minLat) && (latitude <= maxLat)
+  }
+
+  // Update the count of previous interval and current interval using mapWithState
+  def mappingFunc(time: Time, key: String, one: Option[Int], state: State[Tuple3[Int, String, Int]]): Option[Tuple2[String,Tuple3[Int, String, Int]]] = {
+    val cur = one.getOrElse(0).toInt
+    var prev = 0
+    if(state.exists()){
+      prev = state.get()._1
+    }
+    val output = (key, (cur,"%08d".format(time.milliseconds),prev))
+    state.update((cur,"%08d".format(time.milliseconds),prev))
+    if ((cur >= 2 * prev) && (cur >= 10)) {
+      if (key.equals("goldman")) {
+        println(s"Number of arrivals to Goldman Sachs has doubled from ${prev.toString} to ${cur.toString} at ${"%08d".format(time.milliseconds)}!")
+      }
+      if (key.equals("citigroup")){
+        println(s"Number of arrivals to Citigroup has doubled from ${prev.toString} to ${cur.toString} at ${"%08d".format(time.milliseconds)}!")
+      }
+    }
+    Some(output)
+  }
+
   def main(argv: Array[String]): Unit = {
     val args = new TrendingArrivalsConf(argv)
+    val output = args.output()
 
     log.info("Input: " + args.input())
 
@@ -67,25 +107,6 @@ object TrendingArrivals {
     val rdds = buildMockStream(ssc.sparkContext, args.input())
     val inputData: mutable.Queue[RDD[String]] = mutable.Queue()
     val stream = ssc.queueStream(inputData)
-
-    val goldman = List((-74.0141012, 40.7152191), (-74.013777, 40.7152275), (-74.0141027, 40.7138745), (-74.0144185, 40.7140753))
-    val citigroup = List((-74.011869, 40.7217236), (-74.009867, 40.721493), (-74.010140,40.720053), (-74.012083, 40.720267))
-
-    def WithinRegion(ranges: List[(Double,Double)], longitude: Double, latitude: Double) : Boolean = {
-      var minLat = Double.MaxValue
-      var maxLat = Double.MinValue
-      var minLong = Double.MaxValue
-      var maxLong = Double.MinValue
-      for (range <- ranges) {
-        var lon = range._1
-        var lat = range._2
-        if (minLat > lat) minLat = lat
-        if (minLong > lon) minLong = lon
-        if (maxLat < lat) maxLat = lat
-        if (maxLong < lon) maxLong = lon
-      }
-      (longitude >= minLong) && (longitude <= maxLong) && (latitude >= minLat) && (latitude <= maxLat)
-    }
 
     val wc = stream.map(_.split(","))
       .flatMap(tuple => {
@@ -108,48 +129,22 @@ object TrendingArrivals {
       })
       .reduceByKeyAndWindow(
         (x: Int, y: Int) => x + y, (x: Int, y: Int) => x - y, Minutes(10), Minutes(10))
-      .persist()
 
     // Initial state RDD for mapWithState operation
-    val initialRDD = ssc.sparkContext.parallelize(List(("goldman", 0), ("citigroup", 0)))
-
-    // Update the count of previous interval and current interval using mapWithState
-    val mappingFunc = (key: String, one: Option[Int], state: State[Int]) => {
-      val cur = one.getOrElse(0)
-      val prev = state.getOption.getOrElse(0)
-      val output = (key, (cur,prev))
-      state.update(cur)
-      output
-    }
+    //val initialRDD = ssc.sparkContext.parallelize(List(("goldman", 0), ("citigroup", 0)))
 
     val stateDStream = wc
-      .mapWithState(StateSpec.function(mappingFunc).initialState(initialRDD))
-      .persist()
+      .mapWithState(StateSpec.function(mappingFunc _))
 
-    stateDStream.saveAsTextFiles(args.output()+"/part")
+    var streamedShot = stateDStream.stateSnapshots()
+    streamedShot.foreachRDD(
+      (rdd,TimeStamp) => {
+        val time = "%08d".format(TimeStamp.milliseconds)
+        rdd.saveAsTextFile(output+"/part-"+time)
+      }
+    )
 
-    // compare the intervals count
-    stateDStream
-      .filter(tuple => {
-        val word = tuple._1
-        val pre = tuple._2._2
-        val cur = tuple._2._1
-        (cur >= 2 * pre) && (cur >= 10)
-      })
-      .foreachRDD((rdd,time) => {
-        rdd.foreach( tuple => {
-          val word = tuple._1
-          val pre = tuple._2._2
-          val cur = tuple._2._1
-          if (word == "goldman") {
-            println(s"Number of arrivals to Goldman Sachs has doubled from $pre to $cur at ${time.milliseconds}!")
-          } else {
-            println(s"Number of arrivals to Citigroup has doubled from $pre to $cur at ${time.milliseconds}!")
-          }
-        })
-      })
-
-    wc.foreachRDD(rdd => {
+    stateDStream.foreachRDD(rdd => {
       numCompletedRDDs.add(1L)
     })
     ssc.checkpoint(args.checkpoint())
